@@ -1,0 +1,19 @@
+# Ambientes Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+env/
+
+# Arquivos gerados (ficam no Drive, não no GitHub)
+*.xlsx
+*.xls
+*.json
+*.log
+*.wav
+*.mp3
+
+# Sistema
+.DS_Store
+Thumbs.db
