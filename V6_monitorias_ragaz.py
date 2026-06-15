@@ -1142,7 +1142,7 @@ def main() -> int:
 
     base        = Path(args.base)
     transcr_dir = base / "TRANSCRIÇÕES"
-    audios_dir  = base / "AUDIOS"
+    audios_dir  = base / "AUDIOS"   # refinado abaixo após ler XLS
     mes_ref     = datetime.now().strftime("%B/%Y").capitalize()
     output_dir  = base / f"RELATÓRIOS {datetime.now():%d.%m.%y}"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1172,6 +1172,24 @@ def main() -> int:
     if args.max and args.max > 0:
         bem_suc = bem_suc[:args.max]
     LOG.info(f"Bem-sucedidas elegíveis: {len(bem_suc)}")
+
+    # Detectar pasta de áudios pelo mês predominante no XLS
+    datas_xls = [l["data"] for l in ligacoes if l.get("data")]
+    if datas_xls:
+        from collections import Counter as _Ctr
+        _mes_ano = _Ctr(d[:7] for d in datas_xls).most_common(1)[0][0]  # "2026-05"
+        _ano, _mes = _mes_ano.split("-")
+        _MESES_PT = {
+            "01": "JANEIRO", "02": "FEVEREIRO", "03": "MARÇO", "04": "ABRIL",
+            "05": "MAIO",    "06": "JUNHO",     "07": "JULHO", "08": "AGOSTO",
+            "09": "SETEMBRO","10": "OUTUBRO",   "11": "NOVEMBRO","12": "DEZEMBRO",
+        }
+        _pasta_mes = audios_dir / f"{_MESES_PT[_mes]}_{_ano}"
+        if _pasta_mes.exists():
+            audios_dir = _pasta_mes
+            LOG.info(f"Pasta de áudios detectada pelo mês do XLS: {audios_dir}")
+        else:
+            LOG.warning(f"Pasta {_pasta_mes} não encontrada — usando {audios_dir}")
 
     # 2) Indexar
     indice = IndiceArquivos(transcr_dir, audios_dir)
