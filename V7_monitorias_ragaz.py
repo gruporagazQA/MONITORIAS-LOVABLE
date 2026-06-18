@@ -569,11 +569,19 @@ class ClaudeAnalyzer:
                 self.tokens_out += resp.usage.output_tokens
                 return analise
             except Exception as e:
-                LOG.warning(f"Claude tentativa {tentativa}/{MAX_RETRIES_CLAUDE}: {str(e)[:80]}")
+                msg = str(e)
+                # 401 = chave inválida/expirada — aborta imediatamente, não adianta tentar mais
+                if "401" in msg or "authentication_error" in msg.lower() or "invalid x-api-key" in msg.lower():
+                    raise RuntimeError(
+                        "\n[ERRO FATAL] API key inválida ou expirada (401).\n"
+                        "Configure a chave e re-execute:\n"
+                        "  $env:ANTHROPIC_API_KEY = 'sk-ant-...'\n"
+                    ) from e
+                LOG.warning(f"Claude tentativa {tentativa}/{MAX_RETRIES_CLAUDE}: {msg[:80]}")
                 if tentativa < MAX_RETRIES_CLAUDE:
                     time.sleep(CLAUDE_RETRY_DELAY * tentativa)
                 else:
-                    self.erros.append({"gestor": lig["gestor"], "motivo": str(e)[:120]})
+                    self.erros.append({"gestor": lig["gestor"], "motivo": msg[:120]})
         return None
 
     def processar_area(self, ligacoes: List[Dict], area_id: str, dry_run: bool) -> int:

@@ -303,11 +303,11 @@ def montar_json(registros: List[Dict]) -> Dict:
     return {
         "meta": {
             "gerado_em":        datetime.now().isoformat(),
-            "mes_referencia":   "2026-05",
+            "mes_referencia":   MES_REF,
             "total_registros":  len(registros),
             "areas":            [info["nome"] for info in AREAS.values()],
             "instrucao_ia": (
-                "Este JSON contém transcrições de ligações da equipe Ragaz em maio/2026. "
+                f"Este JSON contém transcrições de ligações da equipe Ragaz em {MES_LABEL}/{MES_ANO}. "
                 "Use 'por_gestor', 'por_area' ou 'por_data' para localizar IDs rapidamente, "
                 "depois consulte 'transcricoes' pelo campo 'id' para obter o texto completo."
             ),
@@ -329,7 +329,37 @@ def montar_index(registros: List[Dict]) -> List[Dict]:
 
 # ── main ──────────────────────────────────────────────────────────────────────
 
+_MESES_PT = {
+    "01":"janeiro","02":"fevereiro","03":"março","04":"abril",
+    "05":"maio","06":"junho","07":"julho","08":"agosto",
+    "09":"setembro","10":"outubro","11":"novembro","12":"dezembro",
+}
+
 def main() -> int:
+    import argparse
+    parser = argparse.ArgumentParser(description="Exporta transcrições para JSON — Lovable AI")
+    parser.add_argument("--mes", default="",
+                        help="Mês no formato YYYY-MM (padrão: mês corrente)")
+    args = parser.parse_args()
+
+    # Determina mês de referência
+    if args.mes:
+        if not re.match(r"^\d{4}-\d{2}$", args.mes):
+            LOG.error("--mes deve estar no formato YYYY-MM, ex: 2026-06")
+            return 2
+        mes_ym = args.mes
+    else:
+        mes_ym = datetime.now().strftime("%Y-%m")
+
+    ano, mes_num = mes_ym.split("-")
+    mes_label    = _MESES_PT.get(mes_num, mes_num)
+
+    # Injeta como globais para montar_json poder usar
+    global MES_REF, MES_LABEL, MES_ANO
+    MES_REF   = mes_ym        # "2026-06"
+    MES_LABEL = mes_label     # "junho"
+    MES_ANO   = ano           # "2026"
+
     ts         = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_dir = BASE_DIR / f"RELATÓRIOS {datetime.now():%d.%m.%y}"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -339,23 +369,31 @@ def main() -> int:
         LOG.error(f"Nenhum XLS encontrado em {BASE_DIR}")
         return 2
 
-    ligacoes = ler_ligacoes(xls)
+    # Filtra ligações pelo mês informado
+    ligacoes_todas = ler_ligacoes(xls)
+    ligacoes = [l for l in ligacoes_todas if l.get("data","").startswith(mes_ym)]
+    LOG.info(f"Ligações do mês {mes_ym}: {len(ligacoes)} (de {len(ligacoes_todas)} no XLS)")
+
     idx_txt  = indexar_txts()
+    # Restringe TXTs ao mês informado (chave = "YYYY-MM-DD|tel")
+    idx_txt  = {k: v for k, v in idx_txt.items() if k[:7] == mes_ym}
+    LOG.info(f"TXTs do mês {mes_ym}: {len(idx_txt)}")
+
     registros = montar_registros(ligacoes, idx_txt)
 
     if not registros:
-        LOG.error("Nenhuma transcrição encontrada após casamento. Verifique TRANSCRIÇÕES\ e o XLS.")
+        LOG.error("Nenhuma transcrição encontrada após casamento. Verifique TRANSCRIÇÕES e o XLS.")
         return 1
 
     # ── arquivo principal ──────────────────────────────────────────────────
     json_completo = montar_json(registros)
-    path_completo = output_dir / f"transcricoes_maio_{ts}.json"
+    path_completo = output_dir / f"transcricoes_{mes_label}_{ts}.json"
     with path_completo.open("w", encoding="utf-8") as f:
         json.dump(json_completo, f, ensure_ascii=False, indent=2, default=str)
 
     # ── índice leve (sem texto) ────────────────────────────────────────────
     json_index = montar_index(registros)
-    path_index = output_dir / f"transcricoes_index_{ts}.json"
+    path_index = output_dir / f"transcricoes_index_{mes_label}_{ts}.json"
     with path_index.open("w", encoding="utf-8") as f:
         json.dump(json_index, f, ensure_ascii=False, indent=2, default=str)
 
