@@ -15,7 +15,7 @@
    - Nome do arquivo com identificação clara: RELATORIO_MES_ANO_V7_FINAL.xlsx
 
  USO (PowerShell):
-   python "G:\Meu Drive\ARQUITETURA LOVABLE\LINGUAGEM EM CÓDIGO\V7_monitorias_ragaz.py"
+   python "G:\\Meu Drive\\ARQUITETURA LOVABLE\\LINGUAGEM EM CODIGO\\V7_monitorias_ragaz.py"
 
  OPÇÕES:
    --area     TODAS | SUCESSO_CORRETOR | ATENDIMENTO | COMERCIAL_CADASTRO

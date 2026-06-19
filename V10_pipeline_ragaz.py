@@ -22,25 +22,25 @@
 
  USO (PowerShell):
    # Ciclo completo (mês corrente)
-   python "...\V10_pipeline_ragaz.py"
+   python "...\\V10_pipeline_ragaz.py"
 
    # Mês específico
-   python "...\V10_pipeline_ragaz.py" --mes 2026-07
+   python "...\\V10_pipeline_ragaz.py" --mes 2026-07
 
    # Pular fases 1-3 (downloads já feitos)
-   python "...\V10_pipeline_ragaz.py" --fases 4,5,6,7
+   python "...\\V10_pipeline_ragaz.py" --fases 4,5,6,7
 
    # Pular Whisper (só Google + Claude)
-   python "...\V10_pipeline_ragaz.py" --fases 1,2,3,4,7
+   python "...\\V10_pipeline_ragaz.py" --fases 1,2,3,4,7
 
    # Modelo Whisper mais rápido (tiny/base/small/medium, padrão: small)
-   python "...\V10_pipeline_ragaz.py" --modelo-whisper small
+   python "...\\V10_pipeline_ragaz.py" --modelo-whisper small
 
    # Primeiro login manual Bitrix (necessário apenas uma vez)
-   python "...\V10_pipeline_ragaz.py" --setup-sessao
+   python "...\\V10_pipeline_ragaz.py" --setup-sessao
 
    # Registrar no Agendador de Tarefas do Windows (22:00 diário)
-   python "...\V10_pipeline_ragaz.py" --agendar --hora 22:00
+   python "...\\V10_pipeline_ragaz.py" --agendar --hora 22:00
 
  PRÉ-REQUISITOS:
    .env em AUTOMAÇÃO EXPORTAÇÃO com BITRIX_WEBHOOK
