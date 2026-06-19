@@ -40,8 +40,8 @@
    # Primeiro login manual Bitrix (necessário apenas uma vez)
    python "...\\V12_pipeline_ragaz.py" --setup-sessao
 
-   # Registrar no Agendador de Tarefas do Windows (22:00 diário)
-   python "...\\V12_pipeline_ragaz.py" --agendar --hora 22:00
+   # Registrar no Agendador de Tarefas do Windows (09:30 diário)
+   python "...\\V12_pipeline_ragaz.py" --agendar --hora 09:30
 
  PRÉ-REQUISITOS:
    .env em AUTOMAÇÃO EXPORTAÇÃO com BITRIX_WEBHOOK
@@ -53,7 +53,7 @@
    Fase 5    ~2h       (Whisper small em ~50 gaps)
    Fase 6    ~2 min    (Claude só nos gaps novos do Whisper — não re-analisa tudo)
    Fase 7    <1 min
-   TOTAL     ~4h       → agendar às 22:00 para ter o relatório pela manhã
+   TOTAL     ~4h       → agendado às 09:30 (sem infraestrutura em nuvem — execução local)
 
  NOVIDADES V12 vs V11:
    - Fase 5 recebe o timestamp de início da Fase 4 e usa-o para filtrar
@@ -382,8 +382,8 @@ def main() -> int:
                         help="Abre Bitrix24 em janela para renovar login")
     parser.add_argument("--agendar",        action="store_true",
                         help="Registra no Agendador de Tarefas do Windows")
-    parser.add_argument("--hora",           default="22:00",
-                        help="Hora do agendamento HH:MM (padrão: 22:00)")
+    parser.add_argument("--hora",           default="09:30",
+                        help="Hora do agendamento HH:MM (padrão: 09:30)")
     args = parser.parse_args()
 
     if args.setup_sessao:
