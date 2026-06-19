@@ -1149,13 +1149,14 @@ def gerar_excel(ligacoes: List[Dict], output_dir: Path, ts: str,
     _cab(ws5, r, 3); r += 1
 
     MOTIVOS_LABEL = {
-        "sem_audio_sem_txt":  "Sem áudio e sem transcrição (não baixado do Bitrix)",
-        "transcricao_falhou": "Áudio existe mas transcrição falhou",
-        "texto_muito_curto":  "Transcrição gerada mas texto muito curto (<50 chars)",
-        "audio_ininteligivel":"Áudio ininteligível (Google não reconheceu)",
-        "rate_limit_google":  "Rate limit da API Google Speech",
-        "falha_tecnica":      "Falha técnica na transcrição",
-        None:                 "Transcrição existente mas análise Claude falhou",
+        "sem_audio_sem_txt":        "Sem áudio e sem transcrição (não baixado do Bitrix)",
+        "transcricao_falhou":       "Áudio existe mas transcrição falhou",
+        "texto_muito_curto":        "Transcrição gerada mas texto muito curto (<50 chars)",
+        "audio_ininteligivel":      "Áudio ininteligível (Google não reconheceu)",
+        "rate_limit_google":        "Rate limit da API Google Speech",
+        "falha_tecnica":            "Falha técnica na transcrição",
+        "txt_anterior_ao_whisper":  "TXT existente — anterior ao Whisper desta rodada (já analisado)",
+        None:                       "Transcrição existente mas análise Claude falhou",
     }
     motivos = Counter(l.get("sem_transcricao_motivo") for l in bem_suc if not l.get("analise"))
     total_fora = sum(motivos.values()) or 1

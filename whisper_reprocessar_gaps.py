@@ -12,10 +12,10 @@
  (ou via pipeline V9 Fase 6) eles serão aproveitados automaticamente.
 
  USO (PowerShell):
-   python "G:\Meu Drive\ARQUITETURA LOVABLE\LINGUAGEM EM CÓDIGO\whisper_reprocessar_gaps.py"
+   python "G:\\Meu Drive\\ARQUITETURA LOVABLE\\LINGUAGEM EM CODIGO\\whisper_reprocessar_gaps.py"
 
  OPÇÕES:
-   --relatorio   Caminho do xlsx V6 (padrão: mais recente em RELATÓRIOS*)
+   --relatorio   Caminho do xlsx V7 (padrão: mais recente em RELATÓRIOS*)
    --audios      Pasta de MP3s (padrão: AUDIOS\JUNHO_2026)
    --modelo      Modelo Whisper: tiny | base | small | medium (padrão: small)
    --max         Limita N áudios (para testes)
@@ -137,8 +137,10 @@ def main():
         df = df[df["Motivo"].str.contains("ininteligível|erro_google", case=False, na=False)]
         print(f"Filtrado para ininteligíveis/erro API: {len(df)}")
 
-    # Excluir os que não têm áudio (nada a fazer por eles)
-    df = df[~df["Motivo"].str.contains("não baixado", case=False, na=False)]
+    # Excluir: sem áudio (nada a fazer) e TXTs filtrados pelo --novos-desde (já têm transcrição)
+    df = df[~df["Motivo"].str.contains(
+        "não baixado|txt_anterior_ao_whisper", case=False, na=False
+    )]
     print(f"Com áudio potencial para reprocessar: {len(df)}")
 
     if args.max and args.max > 0:
