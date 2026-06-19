@@ -434,6 +434,7 @@ def casar_transcricoes(ligacoes: List[Dict], indice: IndiceArquivos) -> int:
             txt = arq.read_text(encoding="utf-8", errors="replace").strip()
             if len(txt) >= 50:
                 lig["transcricao"] = txt
+                lig["txt_path"] = str(arq)
                 lig["transcricao_fonte"] = "TXT_EXISTENTE" if "TRANSCRIÇÕES" in str(arq) else "MP3_NOVO"
                 encontradas += 1
             else:
@@ -562,15 +563,19 @@ class ClaudeAnalyzer:
                     max_tokens=max_tokens,
                     messages=[{"role": "user", "content": prompt}],
                 )
-                analise = self._parse_json(resp.content[0].text)
-                if analise is None:
-                    raise RuntimeError("JSON inválido na resposta")
+                # Conta tokens SEMPRE — inclusive em respostas com JSON malformado
                 self.tokens_in  += resp.usage.input_tokens
                 self.tokens_out += resp.usage.output_tokens
+                analise = self._parse_json(resp.content[0].text)
+                if analise is None:
+                    # JSON inválido: não adianta retentar (é problema de formato, não de rede)
+                    LOG.warning(f"JSON inválido (sem retry): {resp.content[0].text[:120]}")
+                    self.erros.append({"gestor": lig["gestor"], "motivo": "json_invalido"})
+                    return None
                 return analise
             except Exception as e:
                 msg = str(e)
-                # 401 = chave inválida/expirada — aborta imediatamente, não adianta tentar mais
+                # 401 = chave inválida/expirada — aborta imediatamente
                 if "401" in msg or "authentication_error" in msg.lower() or "invalid x-api-key" in msg.lower():
                     raise RuntimeError(
                         "\n[ERRO FATAL] API key inválida ou expirada (401).\n"
@@ -1166,6 +1171,8 @@ def main() -> int:
     parser.add_argument("--dry-run",  action="store_true")
     parser.add_argument("--so-txts",  action="store_true",
                         help="Pula transcrição de MP3, usa só TXTs existentes")
+    parser.add_argument("--novos-desde", default="",
+                        help="Fase 6: analisa só TXTs criados após este timestamp ISO (ex: 2026-06-19T13:00:00)")
     args = parser.parse_args()
 
     base        = Path(args.base)
@@ -1235,6 +1242,23 @@ def main() -> int:
 
     # 4) Casar transcrições
     casar_transcricoes(bem_suc, indice)
+
+    # 4b) --novos-desde: restringe análise aos TXTs criados após o timestamp (Fase 6 Whisper)
+    if args.novos_desde:
+        try:
+            ts_limite = datetime.fromisoformat(args.novos_desde).timestamp()
+            antes = sum(1 for l in bem_suc if l.get("transcricao"))
+            for lig in bem_suc:
+                if lig.get("transcricao") and lig.get("txt_path"):
+                    if Path(lig["txt_path"]).stat().st_mtime < ts_limite:
+                        del lig["transcricao"]
+                        lig.pop("txt_path", None)
+                        lig["sem_transcricao_motivo"] = "txt_anterior_ao_whisper"
+            depois = sum(1 for l in bem_suc if l.get("transcricao"))
+            LOG.info(f"  --novos-desde {args.novos_desde}: {antes} → {depois} TXTs do Whisper para analisar")
+        except ValueError:
+            LOG.error(f"--novos-desde formato inválido (esperado ISO): {args.novos_desde!r}")
+            return 2
 
     # 5) Análise Claude por área
     analyzer   = ClaudeAnalyzer()
