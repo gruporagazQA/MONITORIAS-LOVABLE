@@ -625,8 +625,10 @@ def is_aprovado(lig: Dict) -> Optional[bool]:
             return None
 
     if area in ("SUCESSO_CORRETOR", "COMERCIAL_CADASTRO"):
-        ef = str(a.get("efetivo", "")).upper()
-        return ef == "SIM" if ef in ("SIM", "NAO") else None
+        ef = norm(a.get("efetivo", ""))  # remove acentos: "não"→"nao", "sim"→"sim"
+        if ef in ("sim",): return True
+        if ef in ("nao", "nao", "parcial"): return False
+        return None
 
     return None
 
@@ -771,12 +773,21 @@ def gerar_excel(ligacoes: List[Dict], output_dir: Path, ts: str,
         ws2.column_dimensions[get_column_letter(c)].width = 16
 
     row2 = 2
+    # Agrupa pelos nomes reais do XLS (evita falha de match quando o XLS
+    # tem nome completo e o config tem só o primeiro nome)
+    from collections import defaultdict as _dd
+    gestores_vistos: dict = _dd(list)
+    for l in analisadas:
+        gestores_vistos[(l["area"], l["gestor"])].append(l)
+
     for area_id, info in AREAS.items():
-        for ag in info["agentes"]:
-            ag_n   = norm(ag)
-            ligs_g = [l for l in analisadas
-                      if l["area"] == area_id and norm(l["gestor"]) == ag_n]
-            if not ligs_g: continue
+        # Ordena pelos agentes do config (mantém ordem visual), mas aceita qualquer
+        # variação de nome desde que a área bata
+        pares = sorted(
+            [(gestor, ligs) for (aid, gestor), ligs in gestores_vistos.items() if aid == area_id],
+            key=lambda x: x[0],
+        )
+        for gestor_nome, ligs_g in pares:
             aprov  = sum(1 for l in ligs_g if is_aprovado(l) is True)
             taxa   = round(aprov / len(ligs_g) * 100, 1)
             nota_m = ""
@@ -786,7 +797,7 @@ def gerar_excel(ligacoes: List[Dict], output_dir: Path, ts: str,
             ca = sum(1 for l in ligs_g if coaching(l) == "ALTA")
             cm = sum(1 for l in ligs_g if coaching(l) == "MEDIA")
             cb = sum(1 for l in ligs_g if coaching(l) == "BAIXA")
-            ws2.append([ag, info["nome"], info["supervisor"],
+            ws2.append([gestor_nome, info["nome"], info["supervisor"],
                         len(ligs_g), aprov, taxa, nota_m, ca, cm, cb])
             if taxa >= 70:
                 for c in range(1, len(hdrs2)+1): ws2.cell(row=row2, column=c).fill = G_FILL
