@@ -375,6 +375,10 @@ def main() -> int:
         int(f.strip()) for f in args.fases.split(",") if f.strip().isdigit()
     })
 
+    # Checar API key antes de iniciar qualquer download se as fases 4 ou 6 estão no escopo
+    if {4, 6} & set(fases_rodar) and not _checar_api_key():
+        return 1
+
     LOG.info("=" * 65)
     LOG.info(f"RAGAZ PIPELINE V9 — {datetime.datetime.now():%Y-%m-%d %H:%M:%S}")
     LOG.info(f"Mês de referência  : {mes_ym}")

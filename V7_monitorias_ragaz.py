@@ -134,7 +134,7 @@ SPEECH_LANG = "pt-BR"
 # 2. LOGGING
 # ============================================================================
 
-LOG = logging.getLogger("ragaz_v6")
+LOG = logging.getLogger("ragaz_v7")
 LOG.setLevel(logging.INFO)
 _fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s", "%Y-%m-%d %H:%M:%S")
 _sh  = logging.StreamHandler(sys.stdout)
@@ -1277,7 +1277,7 @@ def main() -> int:
             for area_id, info in AREAS.items()
         },
     }
-    json_path = output_dir / f"RELATORIO_{mes_ref.upper().replace('/','_')}_V6_{ts}.json"
+    json_path = output_dir / f"RELATORIO_{mes_ref.upper().replace('/','_')}_V7_{ts}.json"
     with json_path.open("w", encoding="utf-8") as f:
         json.dump(json_data, f, ensure_ascii=False, indent=2, default=str)
 
