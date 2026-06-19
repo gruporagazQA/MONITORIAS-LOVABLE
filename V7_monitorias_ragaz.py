@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 ================================================================================
- RAGAZ — MONITORIAS 2026 — V7
+ RAGAZ — MONITORIAS 2026 — V7.1
 ================================================================================
  Novidades em relação ao V5:
    - Relatório completo gerado automaticamente ao final (sem script separado)
@@ -13,6 +13,12 @@
    - Cobertura: motivo de cada ligação fora da análise
    - Proteção contra duplicatas por ID (data+hora+telefone)
    - Nome do arquivo com identificação clara: RELATORIO_MES_ANO_V7_FINAL.xlsx
+
+ V7.1:
+   - Cache de análises: JSON salva análise por ligação; próximas rodadas
+     carregam do cache e NÃO chamam o Claude para o que já foi analisado
+   - JSON inválido do Claude não retenta (elimina custo 3x do spike 02/06)
+   - --novos-desde: Fase 6 analisa só TXTs gerados pelo Whisper nesta rodada
 
  USO (PowerShell):
    python "G:\\Meu Drive\\ARQUITETURA LOVABLE\\LINGUAGEM EM CODIGO\\V7_monitorias_ragaz.py"
@@ -236,6 +242,27 @@ def col(df: pd.DataFrame, candidatas: List[str]) -> Optional[str]:
 def lig_id(lig: Dict) -> str:
     """ID único da ligação: data + hora + últimos 8 dígitos do telefone."""
     return f"{lig['data']}_{lig['hora'].replace(':','')}_{u8(lig['telefone'])}"
+
+
+def carregar_cache_analises(base_dir: Path) -> dict:
+    """Lê todos os JSONs de relatório do mês e monta {lig_id: analise}.
+
+    Ligações já analisadas em rodadas anteriores são recuperadas daqui —
+    sem chamar a API do Claude novamente.
+    """
+    cache: dict = {}
+    for pasta in sorted(base_dir.glob("RELATÓRIOS*")):
+        for arq in sorted(pasta.glob("RELATORIO_*_V7*.json"), key=lambda p: p.stat().st_mtime):
+            try:
+                data = json.loads(arq.read_text(encoding="utf-8"))
+                for entry in data.get("ligacoes", []):
+                    lid     = entry.get("id")
+                    analise = entry.get("analise")
+                    if lid and analise:
+                        cache[lid] = analise
+            except Exception as e:
+                LOG.warning(f"Cache: falha ao ler {arq.name}: {e}")
+    return cache
 
 # ============================================================================
 # 4. LEITURA DO XLS
@@ -590,7 +617,7 @@ class ClaudeAnalyzer:
         return None
 
     def processar_area(self, ligacoes: List[Dict], area_id: str, dry_run: bool) -> int:
-        candidatas = [l for l in ligacoes if l["area"] == area_id and l.get("transcricao")]
+        candidatas = [l for l in ligacoes if l["area"] == area_id and l.get("transcricao") and not l.get("analise")]
         nome = AREAS[area_id]["nome"]
         LOG.info(f"[{nome}] {len(candidatas)} ligações com transcrição para analisar.")
 
@@ -1189,7 +1216,7 @@ def main() -> int:
     _add_file_log(output_dir)
 
     LOG.info("=" * 70)
-    LOG.info(f"RAGAZ MONITORIAS V7 — {datetime.now():%Y-%m-%d %H:%M:%S}")
+    LOG.info(f"RAGAZ MONITORIAS V7.1 — {datetime.now():%Y-%m-%d %H:%M:%S}")
     LOG.info(f"Área: {args.area}  |  dry-run: {args.dry_run}  |  só-txts: {args.so_txts}")
     if args.data: LOG.info(f"Filtro de data: {args.data}")
     LOG.info("=" * 70)
@@ -1260,6 +1287,16 @@ def main() -> int:
             LOG.error(f"--novos-desde formato inválido (esperado ISO): {args.novos_desde!r}")
             return 2
 
+    # 4c) Cache: recupera análises de rodadas anteriores sem chamar o Claude
+    cache_analises = carregar_cache_analises(base)
+    cache_hits = 0
+    for lig in bem_suc:
+        if not lig.get("analise") and lig.get("id") in cache_analises:
+            lig["analise"] = cache_analises[lig["id"]]
+            lig["analise_fonte"] = "cache"
+            cache_hits += 1
+    LOG.info(f"  Cache: {len(cache_analises)} entradas → {cache_hits} análises recuperadas (sem Claude)")
+
     # 5) Análise Claude por área
     analyzer   = ClaudeAnalyzer()
     areas_rod  = [args.area] if args.area != "TODAS" else list(AREAS.keys())
@@ -1278,11 +1315,11 @@ def main() -> int:
     xlsx_path  = gerar_excel(bem_suc, output_dir, ts,
                              analyzer.tokens_in, analyzer.tokens_out, mes_ref)
 
-    # 7) JSON resumo
+    # 7) JSON resumo + cache de análises por ligação
     custo_usd = analyzer.tokens_in * PRECO_INPUT + analyzer.tokens_out * PRECO_OUTPUT
     json_data = {
         "gerado_em":  datetime.now().isoformat(),
-        "versao":     "V7",
+        "versao":     "V7.1",
         "modelo":     CLAUDE_MODEL,
         "mes_ref":    mes_ref,
         "tokens_in":  analyzer.tokens_in,
@@ -1300,6 +1337,18 @@ def main() -> int:
             }
             for area_id, info in AREAS.items()
         },
+        "ligacoes": [
+            {
+                "id":            l.get("id", ""),
+                "data":          l.get("data", ""),
+                "hora":          l.get("hora", ""),
+                "gestor":        l.get("gestor", ""),
+                "area":          l.get("area", ""),
+                "analise_fonte": l.get("analise_fonte", "claude"),
+                "analise":       l.get("analise"),
+            }
+            for l in bem_suc if l.get("analise")
+        ],
     }
     json_path = output_dir / f"RELATORIO_{mes_ref.upper().replace('/','_')}_V7_{ts}.json"
     with json_path.open("w", encoding="utf-8") as f:
@@ -1307,7 +1356,7 @@ def main() -> int:
 
     # 8) Resumo console
     print("\n" + "=" * 70)
-    print("  RAGAZ MONITORIAS V7 — CONCLUÍDO")
+    print("  RAGAZ MONITORIAS V7.1 — CONCLUÍDO")
     print("=" * 70)
     print(f"  XLS lido          : {xls_path.name}")
     print(f"  Bem-sucedidas     : {len(bem_suc)}")
